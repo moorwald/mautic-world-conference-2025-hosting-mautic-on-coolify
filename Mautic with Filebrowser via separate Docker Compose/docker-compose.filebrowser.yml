@@ -1,0 +1,65 @@
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    container_name: mautic-plugin-manager
+    restart: "no"  # Do NOT auto-restart - manual control only
+
+    # Run as www-data user (same as Mautic) for correct permissions
+    user: "33:33"
+
+    environment:
+      # Authentication settings
+      - FB_NOAUTH=false
+      - FB_AUTH_METHOD=json
+      - FB_USERNAME=${FB_ADMIN_USER:-admin}
+      - FB_PASSWORD=${FB_ADMIN_PASSWORD:?FB_ADMIN_PASSWORD is required}
+
+      # Filebrowser configuration
+      - FB_ROOT=/srv/mautic
+      - FB_DATABASE=/config/database.db
+      - FB_LOG=stdout
+
+      # Optional: Set upload limits
+      - FB_BASEURL=
+
+    volumes:
+      # SHARED VOLUMES from Mautic service
+      # These volumes are created by the main Mautic service
+      - mautic_plugins:/srv/mautic/plugins
+      - mautic_themes:/srv/mautic/themes
+      - mautic_media:/srv/mautic/media
+
+      # Filebrowser's own configuration storage
+      - filebrowser_config:/config
+
+    # No ports - Coolify proxy handles this
+    # Uncomment for local development:
+    # ports:
+    #   - "8090:80"
+
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  # EXTERNAL VOLUMES - These are created by the Mautic service
+  # They must exist before starting this service
+  mautic_plugins:
+    name: mautic-shared-plugins
+    external: true  # Volume exists already, created by Mautic service
+
+  mautic_themes:
+    name: mautic-shared-themes
+    external: true
+
+  mautic_media:
+    name: mautic-shared-media
+    external: true
+
+  # LOCAL VOLUME - Filebrowser's own configuration
+  filebrowser_config:
+    name: filebrowser-config
+    driver: local
